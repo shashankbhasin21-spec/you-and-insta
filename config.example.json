@@ -1,0 +1,33 @@
+{
+  "exchange": "kraken",
+  "data_exchange": "bitstamp",
+  "symbols": ["BTC/USD", "ETH/USD"],
+  "timeframe": "4h",
+  "starting_capital": 50.0,
+  "fee_rate": 0.004,
+  "slippage_bps": 5.0,
+  "history_bars": 3000,
+  "live_window_bars": 500,
+  "state_dir": "state",
+  "reoptimize_hours": 24,
+  "risk": {
+    "max_exposure": 0.95,
+    "rebalance_band": 0.15,
+    "min_order_usd": 5.0,
+    "target_vol": 0.6,
+    "vol_lookback": 60,
+    "atr_period": 14,
+    "atr_stop_mult": 3.0,
+    "stop_cooldown_bars": 6,
+    "max_drawdown": 0.25,
+    "daily_loss_limit": 0.06
+  },
+  "optimizer": {
+    "population": 16,
+    "generations": 30,
+    "bits_per_param": 6,
+    "seed": 7,
+    "train_fraction": 0.7,
+    "min_trades": 6
+  }
+}
