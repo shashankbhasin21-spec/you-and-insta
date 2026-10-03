@@ -157,6 +157,7 @@ qbrain/
   data.py        ccxt candles, CSV cache, synthetic data
   cli.py         the `qbrain` command
 docs/RESEARCH.md the 10-project shortlist and what was borrowed from each
+docs/IDEAS.md    backlog of ideas to build next
 tests/           37 offline tests (look-ahead, fees, risk rules, live runner...)
 ```
 
