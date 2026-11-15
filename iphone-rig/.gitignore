@@ -1,0 +1,6 @@
+__pycache__/
+rig.json
+rig_stats.json
+rig_engine.json
+flightsheets.json
+*.tmp
