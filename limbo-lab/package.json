@@ -1,0 +1,15 @@
+{
+  "name": "limbo-lab",
+  "version": "1.0.0",
+  "description": "Verify, replay and analyse provably fair Limbo results. Exact algorithm, exact odds, no dependencies.",
+  "license": "MIT",
+  "private": true,
+  "bin": { "limbo": "bin/limbo.js" },
+  "main": "src/limbo-core.js",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "build": "node build.js",
+    "study": "node research/predictability.js"
+  },
+  "engines": { "node": ">=20" }
+}

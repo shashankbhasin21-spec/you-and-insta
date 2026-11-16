@@ -1,0 +1,165 @@
+LIMBO PREDICTABILITY STUDY
+==========================
+6 seed pairs and 6 control runs, 10,000,000 rounds each.
+
+SEED PAIR 1 IN FULL
+rounds        10,000,000  (nonces 1..10000000)
+server seed   91905d84b64e1fe5888dae70a77fd569dcea92a22b92e7e406d2678271842573
+  its SHA-256 c20e69cd773da3860a26bbf2d26223a81af81f515ee4778ba3ee9402b5674934   <- all a player sees while the seed is live
+client seed   limbo-lab-research-1
+checksum      draws 81a3849b03349991  results 4e7ce4a5bf906a76  (first 1,000,000 rounds; research/ml_attack.py prints the same)
+
+1. RAW DRAW UNIFORMITY
+   first byte, 256 bins      chi2 =   260.3  (expect 255 +- 22.6)  z =   0.23  noise
+   fourth byte, 256 bins     chi2 =   249.7  (expect 255 +- 22.6)  z =  -0.23  noise
+   float, 1000 equal bins    chi2 =   979.4  (expect 999 +- 44.7)  z =  -0.44  noise
+   each of the 32 bits       largest |z| = 1.77  (32 fair bits typically give 1.8-2.7)
+
+2. HOW OFTEN EACH BAND OF RESULTS COMES UP, VERSUS THE EXACT ODDS
+   result                   rounds   observed %     exact %       z
+   1.00x exactly            198691       1.9869      1.9802    1.52  noise
+   1.01x to under 1.5x     3201950      32.0195     32.0198   -0.02  noise
+   1.5x to under 2x        1651347      16.5135     16.5000    1.15  noise
+   2x to under 3x          1650009      16.5001     16.5000    0.01  noise
+   3x to under 5x          1319153      13.1915     13.2000   -0.79  noise
+   5x to under 10x          989563       9.8956      9.9000   -0.46  noise
+   10x to under 100x        890436       8.9044      8.9100   -0.63  noise
+   100x to under 1000x       88980       0.8898      0.8910   -0.40  noise
+   1000x or more              9871       0.0987      0.0990   -0.29  noise
+
+3. MEMORY BETWEEN ROUNDS (win/loss at 2.00x correlated with the round k steps earlier)
+   z by lag   1:0.44  2:-1.88  3:0.59  4:-0.02  5:-1.25  6:1.68  7:-0.76  8:0.88  9:-0.86  10:0.01
+              11:1.01  12:0.83  13:-1.82  14:0.87  15:-0.11  16:-0.14  17:0.35  18:-0.39  19:-1.11  20:0.35
+   largest |z| over 20 lags = 1.88  (20 independent lags typically give 1.6-2.6)
+
+4. IS A WIN "DUE"?  Win rate at 2.00x by the number of losses in a row just before (exact chance 49.5000%)
+   losses before        rounds      win %       z   (z: this row against all other rounds)
+   0                   4948012    49.4872    0.44  noise
+   1                   2499380    49.4099   -2.56  within luck
+   2                   1264439    49.5167    0.88  noise
+   3                    638331    49.6280    2.44  within luck
+   4                    321540    49.4225   -0.66  noise
+   5                    162627    49.4580   -0.18  noise
+   6                     82195    49.6198    0.80  noise
+   7                     41410    49.6136    0.54  noise
+   8                     20865    49.6190    0.40  noise
+   9                     10512    49.7336    0.52  noise
+   10                     5284    49.5647    0.12  noise
+   11                     2665    50.0188    0.56  noise
+   12 or more             2740    48.6131   -0.91  noise
+
+4. IS A WIN "DUE"?  Win rate at 10.00x by the number of losses in a row just before (exact chance 9.9000%)
+   losses before        rounds      win %       z   (z: this row against all other rounds)
+   0-9                 6473415     9.8923   -0.08  noise
+   10-19               2283611     9.8860   -0.40  noise
+   20-29                804536     9.9171    0.76  noise
+   30-39                284148     9.8516   -0.75  noise
+   40-49                 99777    10.0735    1.92  noise
+   50-59                 34936     9.8180   -0.47  noise
+   60 or more            19577     9.6951   -0.93  noise
+
+5. PREDICTOR RULES at 1.50x  (exact win chance 66.0000%; all rounds in this sample won 65.9936%)
+   rule                                              bets     win %   vs all       z  profit/bet
+   Bet every round                               10000000   65.9936                      -0.0101  baseline
+   Bet only after a loss                          3400641   66.0137  +0.0201    0.96     -0.0098  noise
+   Bet only after a win                           6599358   65.9832  -0.0104   -0.96     -0.0103  noise
+   Bet after 2 losses in a row                    1155753   66.0955  +0.1019    2.46     -0.0086  within luck
+   Bet after 5 losses in a row                      44953   66.1624  +0.1688    0.76     -0.0076  noise
+   Bet right after a 10x or higher                 989286   65.9849  -0.0087   -0.19     -0.0102  noise
+   Bet after two results under 1.20x               305912   66.1560  +0.1624    1.93     -0.0077  noise
+   Bet when the last 16 rounds ran cold           4760913   65.9850  -0.0086   -0.55     -0.0102  noise
+   Bet when the last 16 rounds ran hot            5239071   66.0014  +0.0078    0.55     -0.0100  noise
+   Self-learning pattern matcher                  4507996   65.9964  +0.0028    0.17     -0.0101  noise
+   Bet odd-numbered rounds only                   5000000   65.9816  -0.0120   -0.80     -0.0103  noise
+
+5. PREDICTOR RULES at 2.00x  (exact win chance 49.5000%; all rounds in this sample won 49.4801%)
+   rule                                              bets     win %   vs all       z  profit/bet
+   Bet every round                               10000000   49.4801                      -0.0104  baseline
+   Bet only after a loss                          5051988   49.4732  -0.0069   -0.44     -0.0105  noise
+   Bet only after a win                           4948011   49.4872  +0.0071    0.44     -0.0103  noise
+   Bet after 2 losses in a row                    2552608   49.5352  +0.0551    2.04     -0.0093  within luck
+   Bet after 7 losses in a row                      83476   49.6071  +0.1270    0.74     -0.0079  noise
+   Bet right after a 10x or higher                 989286   49.4785  -0.0016   -0.03     -0.0104  noise
+   Bet after two results under 1.20x               305912   49.7313  +0.2512    2.82     -0.0054  within luck
+   Bet when the last 21 rounds ran cold           5193788   49.4892  +0.0091    0.60     -0.0102  noise
+   Bet when the last 21 rounds ran hot            4806191   49.4703  -0.0098   -0.60     -0.0106  noise
+   Self-learning pattern matcher                  5443843   49.4924  +0.0123    0.85     -0.0102  noise
+   Bet odd-numbered rounds only                   5000000   49.4610  -0.0191   -1.21     -0.0108  noise
+
+5. PREDICTOR RULES at 10.00x  (exact win chance 9.9000%; all rounds in this sample won 9.8929%)
+   rule                                              bets     win %   vs all       z  profit/bet
+   Bet every round                               10000000    9.8929                      -0.0107  baseline
+   Bet only after a loss                          9010713    9.8946  +0.0017    0.54     -0.0105  noise
+   Bet only after a win                            989286    9.8775  -0.0153   -0.54     -0.0122  noise
+   Bet after 10 losses in a row                   3526585    9.8939  +0.0010    0.08     -0.0106  noise
+   Bet after 31 losses in a row                    395066    9.8867  -0.0062   -0.13     -0.0113  noise
+   Bet right after a 10x or higher                 989286    9.8775  -0.0153   -0.54     -0.0122  noise
+   Bet after two results under 1.20x               305912   10.0908  +0.1979    3.72      0.0091  unusual
+   Bet when the last 102 rounds ran cold          5704882    9.8990  +0.0061    0.75     -0.0101  noise
+   Bet when the last 102 rounds ran hot           4295016    9.8846  -0.0082   -0.76     -0.0115  noise
+   Self-learning pattern matcher                  7256776    9.9009  +0.0080    1.38     -0.0099  noise
+   Bet odd-numbered rounds only                   5000000    9.8958  +0.0029    0.31     -0.0104  noise
+
+5. PREDICTOR RULES at 100.00x  (exact win chance 0.9900%; all rounds in this sample won 0.9885%)
+   rule                                              bets     win %   vs all       z  profit/bet
+   Bet every round                               10000000    0.9885                      -0.0115  baseline
+   Bet only after a loss                          9901148    0.9889  +0.0004    1.20     -0.0111  noise
+   Bet only after a win                             98851    0.9509  -0.0376   -1.20     -0.0491  noise
+   Bet after 101 losses in a row                  3662443    0.9941  +0.0056    1.37     -0.0059  noise
+   Bet after 304 losses in a row                   484053    1.0001  +0.0116    0.84      0.0001  noise
+   Bet right after a 10x or higher                 989286    0.9814  -0.0071   -0.75     -0.0186  noise
+   Bet after two results under 1.20x               305912    1.0032  +0.0147    0.84      0.0032  noise
+   Bet when the last 1011 rounds ran cold         5840145    0.9938  +0.0053    1.99     -0.0062  noise
+   Bet when the last 1011 rounds ran hot          4158844    0.9811  -0.0074   -2.00     -0.0189  within luck
+   Self-learning pattern matcher                  9189954    0.9882  -0.0003   -0.34     -0.0118  noise
+   Bet odd-numbered rounds only                   5000000    0.9855  -0.0031   -0.97     -0.0145  noise
+
+SCOREBOARD
+   124 tests per run. z measures how far a result sits from "no pattern", in standard errors.
+   run                         largest |z|  |z| >= 2  |z| >= 3
+   Limbo seed pair 1                  3.72         7         1
+   Limbo seed pair 2                  3.21         5         1
+   Limbo seed pair 3                  3.37         7         2
+   Limbo seed pair 4                  3.15         5         2
+   Limbo seed pair 5                  2.82         6         0
+   Limbo seed pair 6                  2.34         6         0
+   control (AES noise) 1              2.71        16         0
+   control (AES noise) 2              2.49         5         0
+   control (AES noise) 3              2.93         2         0
+   control (AES noise) 4              3.86         5         1
+   control (AES noise) 5              2.52         2         0
+   control (AES noise) 6              2.91         8         0
+   Limbo average                      3.10       6.0       1.0
+   control average                    2.90       6.3       0.2
+   theory, no pattern                            5.6       0.3
+
+POOLED OVER ALL 6 RUNS (60,000,000 rounds): a real pattern would grow here, luck averages out
+                               largest |z|  |z| >= 2  |z| >= 3
+   Limbo                              2.67         4         0
+   control (AES noise)                3.28        15         1
+   Most extreme pooled Limbo tests:
+     memory: win/loss at 2x vs 7 round(s) earlier                      2.67
+     memory: win/loss at 2x vs 13 round(s) earlier                    -2.67
+     memory: win/loss at 2x vs 5 round(s) earlier                     -2.44
+     frequency of results: 100x to under 1000x                        -2.23
+     memory: win/loss at 2x vs 15 round(s) earlier                    -1.94
+   Most extreme pooled control tests:
+     "due" check: win rate at 2x after 9 losses                       -3.28
+     uniformity: bit 6 of the draw                                     2.97
+     "due" check: win rate at 10x after 50-59 losses                  -2.79
+     rule at 2x: Bet after 7 losses in a row                          -2.71
+     uniformity: bit 31 of the draw                                    2.56
+
+REPLICATION: the most extreme scores on seed pair 1, looked up on the other 5 seed pairs
+   test                                                            pair 1  others
+   rule at 10x: Bet after two results under 1.20x                    3.72    0.62   0.44   0.20   0.34  -0.95
+   rule at 2x: Bet after two results under 1.20x                     2.82   -0.38   1.17  -0.62   0.50  -0.29
+   "due" check: win rate at 2x after 1 losses                       -2.56   -0.45   0.04  -1.10  -0.26   0.32
+   rule at 1.5x: Bet after 2 losses in a row                         2.46    0.61   0.59   0.24   1.01  -0.49
+   "due" check: win rate at 2x after 3 losses                        2.44    0.54   0.24  -0.06  -0.72   1.14
+   rule at 2x: Bet after 2 losses in a row                           2.04    0.00  -0.10  -0.43   0.98  -0.92
+   rule at 100x: Bet when the last 1011 rounds ran hot              -2.00    0.33  -0.10   0.05  -0.97  -0.91
+   rule at 100x: Bet when the last 1011 rounds ran cold              1.99   -0.35   0.10  -0.07   0.98   0.89
+   0 of 40 follow-up scores land beyond 2 in the same direction (luck alone gives about 0.9).
+
+   For scale: a prediction edge of 1 percentage point at 2.00x would score z = 63 on one seed pair and z = 155 pooled.

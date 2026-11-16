@@ -1,0 +1,36 @@
+MACHINE-LEARNING ATTACK ON LIMBO
+================================
+columns       log-loss below 'no-model' = the model knows something (no-model: always answer the base rate)
+              accuracy above 'no-model %' = better than always guessing the commoner outcome
+              AUC 0.5 = coin flip; 'top 10%' = win rate of the tenth of rounds the model rated most likely to win
+              |z| < 2 is luck
+
+SEED PAIR 1
+rounds        4,000,000  (nonces 1..4000000), generated in 3.0 s by the Python implementation
+server seed   91905d84b64e1fe5888dae70a77fd569dcea92a22b92e7e406d2678271842573
+client seed   limbo-lab-research-1
+checksum      draws 81a3849b03349991  results 4e7ce4a5bf906a76  (first 1,000,000 rounds; research/predictability.js prints the same)
+
+POSITIVE CONTROL: a pattern planted on purpose (a win is 2 points likelier after a loss)
+   trained on rounds 1..3,000,000; scored on the next 1,000,000 unseen rounds (win rate there 50.4632%)
+   model                   log-loss  no-model  accuracy %  no-model %      AUC       z  top 10% win %       z
+   logistic regression     0.693065  0.693104     50.7389     50.4632  0.50819   14.19        51.3580    5.97
+   neural network          0.693007  0.693104     50.7192     50.4632  0.50922   15.97        51.5120    6.99
+
+REAL LIMBO RESULTS
+   trained on rounds 1..3,000,000; scored on the next 1,000,000 unseen rounds (win rate there 49.4515%)
+   model                   log-loss  no-model  accuracy %  no-model %      AUC       z  top 10% win %       z
+   logistic regression     0.693201  0.693087     50.3139     50.5485  0.50070    1.21        49.6910    1.60
+   neural network          0.693141  0.693087     50.4457     50.5485  0.50071    1.22        49.6770    1.50
+
+SEED PAIR 2
+rounds        4,000,000  (nonces 1..4000000), generated in 3.0 s by the Python implementation
+server seed   40e137100451e91b9e565e1713a518e08b0b12fc1967972a0946b7488384a04b
+client seed   limbo-lab-research-2
+checksum      draws 931b75601900be1e  results 6186363238543ecb
+
+REAL LIMBO RESULTS
+   trained on rounds 1..3,000,000; scored on the next 1,000,000 unseen rounds (win rate there 49.4630%)
+   model                   log-loss  no-model  accuracy %  no-model %      AUC       z  top 10% win %       z
+   logistic regression     0.693262  0.693090     50.1097     50.5370  0.49895   -1.82        49.2940   -1.13
+   neural network          0.693171  0.693090     50.2789     50.5370  0.49999   -0.01        49.5140    0.34
