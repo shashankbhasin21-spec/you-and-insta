@@ -1,0 +1,1457 @@
+<title>Limbo Verifier</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single centered column; forms in cards, results below. Palette from the
+   validated dataviz reference (sequential blue + status green/red), one accent. */
+:root {
+  --bg: #f4f3ef;
+  --surface: #fcfcfb;
+  --surface-2: #f0efe9;
+  --ink: #15140f;
+  --ink-2: #52514c;
+  --muted: #8a887f;
+  --line: #e2e0d7;
+  --line-strong: #c7c5b9;
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e7f0fb;
+  --good: #0a7f22;
+  --good-soft: #e3f3e6;
+  --bad: #c23b3b;
+  --bad-soft: #f8e7e6;
+  --warn: #b8791a;
+  --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #5598e7; --seq-4: #2a78d6; --seq-5: #184f95;
+  --shadow: 0 1px 2px rgba(20,20,15,.05), 0 2px 8px rgba(20,20,15,.04);
+  --radius: 14px;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Space Grotesk", var(--sans);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #100f0d;
+    --surface: #1a1a18;
+    --surface-2: #232320;
+    --ink: #f1f0ea;
+    --ink-2: #c3c2b8;
+    --muted: #8a887f;
+    --line: #2c2c29;
+    --line-strong: #3a3a36;
+    --accent: #3987e5;
+    --accent-ink: #ffffff;
+    --accent-soft: #15314f;
+    --good: #37b24d;
+    --good-soft: #15321c;
+    --bad: #e06464;
+    --bad-soft: #3a1f1f;
+    --warn: #e0a53a;
+    --seq-1: #16314e; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #86b6ef;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #100f0d;
+  --surface: #1a1a18;
+  --surface-2: #232320;
+  --ink: #f1f0ea;
+  --ink-2: #c3c2b8;
+  --muted: #8a887f;
+  --line: #2c2c29;
+  --line-strong: #3a3a36;
+  --accent: #3987e5;
+  --accent-ink: #ffffff;
+  --accent-soft: #15314f;
+  --good: #37b24d;
+  --good-soft: #15321c;
+  --bad: #e06464;
+  --bad-soft: #3a1f1f;
+  --warn: #e0a53a;
+  --seq-1: #16314e; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #86b6ef;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.25);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 920px;
+  margin: 0 auto;
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+}
+
+/* Header */
+header { padding-block: 28px 8px; }
+.brand { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mark {
+  width: 40px; height: 40px; border-radius: 11px; flex: none;
+  background: linear-gradient(150deg, var(--accent), var(--seq-5));
+  display: grid; place-items: center; color: #fff; box-shadow: var(--shadow);
+}
+.mark svg { width: 23px; height: 23px; display: block; }
+h1 { font-family: var(--display); font-size: 1.5rem; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.tagline { color: var(--ink-2); margin: 10px 0 0; max-width: 60ch; }
+.theme-btn {
+  margin-left: auto; border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--ink-2); border-radius: 9px; width: 38px; height: 38px; cursor: pointer;
+  display: grid; place-items: center; flex: none;
+}
+.theme-btn:hover { color: var(--ink); border-color: var(--muted); }
+.theme-btn svg { width: 18px; height: 18px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin: 22px 0 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tab {
+  appearance: none; border: 0; background: none; cursor: pointer; font-family: var(--sans);
+  font-size: .95rem; font-weight: 600; color: var(--muted); padding: 10px 14px;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 8px 8px 0 0;
+}
+.tab:hover { color: var(--ink-2); background: var(--surface-2); }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Cards & controls */
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px; margin-bottom: 18px;
+}
+.card h2 { font-family: var(--display); font-size: 1.05rem; margin: 0 0 4px; font-weight: 600; letter-spacing: -.01em; }
+.card .sub { color: var(--ink-2); margin: 0 0 16px; font-size: .9rem; }
+.grid { display: grid; gap: 14px; }
+@media (min-width: 560px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+label.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+label.field .lab { font-size: .78rem; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+label.field .hint { font-size: .74rem; color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+input, select {
+  font-family: var(--sans); font-size: .95rem; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px 12px; width: 100%; min-width: 0;
+}
+input.mono { font-family: var(--mono); font-size: .85rem; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+button.go {
+  appearance: none; border: 0; background: var(--accent); color: var(--accent-ink);
+  font-family: var(--sans); font-size: .95rem; font-weight: 600; padding: 11px 20px;
+  border-radius: 9px; cursor: pointer;
+}
+button.go:hover { filter: brightness(1.06); }
+button.ghost {
+  appearance: none; border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--ink-2); font-family: var(--sans); font-size: .9rem; font-weight: 500;
+  padding: 10px 14px; border-radius: 9px; cursor: pointer;
+}
+button.ghost:hover { color: var(--ink); border-color: var(--muted); }
+
+/* Banners */
+.banner { display: flex; gap: 11px; align-items: flex-start; padding: 13px 15px; border-radius: 11px; margin-bottom: 16px; font-size: .9rem; }
+.banner svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.banner.ok { background: var(--good-soft); color: var(--good); }
+.banner.no { background: var(--bad-soft); color: var(--bad); }
+.banner strong { font-weight: 700; }
+.banner .b-body { color: var(--ink-2); }
+.banner.ok .b-head { color: var(--good); font-weight: 700; }
+.banner.no .b-head { color: var(--bad); font-weight: 700; }
+
+/* Step-by-step verification */
+.steps { display: flex; flex-direction: column; gap: 0; }
+.step { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding-bottom: 16px; }
+.step:not(:last-child) .num::after {
+  content: ""; position: absolute; left: 50%; top: 26px; bottom: -16px; width: 2px;
+  background: var(--line); transform: translateX(-50%);
+}
+.num { position: relative; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft);
+  color: var(--accent); font-weight: 700; font-size: .8rem; display: grid; place-items: center; flex: none; }
+.step-body { min-width: 0; }
+.step-body .t { font-weight: 600; font-size: .9rem; margin: 2px 0 4px; }
+.step-body .d { color: var(--ink-2); font-size: .86rem; }
+.code {
+  font-family: var(--mono); font-size: .82rem; background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px; margin-top: 7px; overflow-x: auto; white-space: pre; color: var(--ink);
+}
+.code .hl { color: var(--accent); font-weight: 600; }
+.code .dim { color: var(--muted); }
+.result-chip {
+  display: inline-flex; align-items: baseline; gap: 8px; margin-top: 8px; padding: 8px 16px;
+  border-radius: 10px; background: var(--accent-soft); font-family: var(--display);
+}
+.result-chip .v { font-size: 1.7rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.result-chip .w { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.result-chip.win { background: var(--good-soft); } .result-chip.win .v, .result-chip.win .w { color: var(--good); }
+.result-chip.loss .w { color: var(--muted); }
+
+/* Stat tiles */
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; }
+.tile .k { font-size: .76rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.tile .v { font-family: var(--display); font-size: 1.7rem; font-weight: 700; margin-top: 5px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.tile .foot { font-size: .8rem; color: var(--ink-2); margin-top: 3px; }
+.tile.accent .v { color: var(--accent); }
+.tile.bad .v { color: var(--bad); }
+.tile.good .v { color: var(--good); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { text-align: right; padding: 9px 13px; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; background: var(--surface-2); position: sticky; top: 0; }
+tbody tr { border-top: 1px solid var(--line); }
+td.num-cell, th.num-cell { font-variant-numeric: tabular-nums; }
+td .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: .78rem; font-weight: 600; }
+.pill.win { background: var(--good-soft); color: var(--good); }
+.pill.loss { background: var(--surface-2); color: var(--muted); }
+.mono-cell { font-family: var(--mono); font-size: .8rem; color: var(--ink-2); }
+
+/* Distribution chart */
+.dist { display: flex; flex-direction: column; gap: 9px; }
+.dist-row { display: grid; grid-template-columns: 112px 1fr 66px; gap: 10px; align-items: center; }
+.dist-row .name { font-size: .83rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.dist-track { background: var(--surface-2); border-radius: 5px; height: 20px; overflow: hidden; }
+.dist-bar { height: 100%; background: var(--accent); border-radius: 5px 0 0 5px; min-width: 2px; }
+.dist-row .pct { font-size: .83rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.note { font-size: .85rem; color: var(--ink-2); background: var(--surface-2); border-left: 3px solid var(--accent); padding: 12px 15px; border-radius: 0 9px 9px 0; margin-top: 4px; }
+.note.warn { border-left-color: var(--warn); }
+.err { color: var(--bad); font-size: .88rem; margin-top: 12px; }
+.prose p { color: var(--ink-2); margin: 0 0 12px; }
+.prose p:last-child { margin-bottom: 0; }
+.prose strong { color: var(--ink); font-weight: 600; }
+.scoreboard { display: grid; gap: 8px; }
+.sb-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; padding: 11px 14px; border-radius: 10px; background: var(--surface-2); font-size: .88rem; }
+.sb-row .sb-label { font-weight: 600; }
+.sb-row .sb-sub { color: var(--muted); font-size: .8rem; font-weight: 400; }
+.sb-row .sb-z { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sb-row.highlight { background: var(--accent-soft); }
+footer { padding: 26px 0 34px; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); margin-top: 8px; }
+footer code { font-family: var(--mono); font-size: .76rem; color: var(--ink-2); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: no-preference) { .dist-bar { transition: width .5s cubic-bezier(.2,.7,.2,1); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 L10 11 L14 14 L20 6"/><path d="M15 6 H20 V11"/></svg>
+      </div>
+      <div>
+        <h1>Limbo Verifier</h1>
+      </div>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle light or dark theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+      </button>
+    </div>
+    <p class="tagline">Recompute any provably fair Limbo round from its seeds, read the exact odds behind every target, and see — across 60&nbsp;million replayed rounds — why no predictor can beat them.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Tools">
+    <button class="tab" role="tab" id="tab-verify" aria-controls="panel-verify" aria-selected="true">Verify a round</button>
+    <button class="tab" role="tab" id="tab-odds" aria-controls="panel-odds" aria-selected="false">Odds &amp; streaks</button>
+    <button class="tab" role="tab" id="tab-reality" aria-controls="panel-reality" aria-selected="false">Reality check</button>
+  </div>
+
+  <!-- VERIFY -->
+  <section id="panel-verify" role="tabpanel" aria-labelledby="tab-verify">
+    <div class="card">
+      <h2>Recompute a round from its seeds</h2>
+      <p class="sub">After a server seed is rotated and revealed, every result it produced can be recomputed exactly. Enter the seeds and a nonce to replay them.</p>
+      <div class="grid two">
+        <label class="field"><span class="lab">Server seed <span class="hint">revealed after rotation</span></span><input id="v-server" class="mono" spellcheck="false" autocapitalize="off"></label>
+        <label class="field"><span class="lab">Client seed</span><input id="v-client" class="mono" spellcheck="false" autocapitalize="off"></label>
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <label class="field"><span class="lab">Hashed server seed <span class="hint">optional — the commitment shown while it was live</span></span><input id="v-hash" class="mono" spellcheck="false" autocapitalize="off" placeholder="sha256 of the server seed"></label>
+        <div class="grid two" style="gap:14px">
+          <label class="field"><span class="lab">First nonce</span><input id="v-nonce" type="number" min="0" step="1" value="1"></label>
+          <label class="field"><span class="lab">Rounds</span><input id="v-count" type="number" min="1" max="100000" step="1" value="1"></label>
+        </div>
+      </div>
+      <div class="row">
+        <button class="go" id="v-run">Verify</button>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-left:auto">
+          <span class="lab" style="margin:0">Mark wins at</span>
+          <input id="v-target" type="number" min="1.01" step="0.01" value="2" style="width:92px">
+        </label>
+      </div>
+      <div id="v-error" class="err" hidden></div>
+    </div>
+    <div id="v-output"></div>
+  </section>
+
+  <!-- ODDS -->
+  <section id="panel-odds" role="tabpanel" aria-labelledby="tab-odds" hidden>
+    <div class="card">
+      <h2>Exact odds for a target</h2>
+      <p class="sub">Every figure here is counted over all 4,294,967,296 possible draws — no sampling. Change the target to see it update.</p>
+      <div class="grid two">
+        <label class="field"><span class="lab">Target multiplier <span class="hint">you cash out at or above this</span></span><input id="o-target" type="number" min="1.01" max="1000000" step="0.01" value="2"></label>
+        <label class="field"><span class="lab">Bets in a session <span class="hint">for the outlook below</span></span><input id="o-bets" type="number" min="1" max="10000000" step="1" value="1000"></label>
+      </div>
+      <div id="o-error" class="err" hidden></div>
+    </div>
+    <div id="o-output"></div>
+  </section>
+
+  <!-- REALITY -->
+  <section id="panel-reality" role="tabpanel" aria-labelledby="tab-reality" hidden>
+    <div class="card">
+      <h2>What the results actually look like</h2>
+      <p class="sub">The exact share of rounds that land in each band, computed over all 4.29&nbsp;billion possible draws. This is the real shape of the game.</p>
+      <div class="dist" id="dist-chart"></div>
+      <p class="note">The chip you win depends only on where a single uniform draw falls on this scale. Nothing about the previous round moves the next one.</p>
+    </div>
+
+    <div class="card">
+      <h2>Can the next result be predicted? No — and here is the test.</h2>
+      <p class="sub">Every round is <code style="font-family:var(--mono);font-size:.82rem">HMAC-SHA256(server seed, "client:nonce:0")</code>. Without the secret server seed, the output is indistinguishable from random. This study replays it at scale and hunts for any usable pattern.</p>
+      <div class="tiles" style="margin-bottom:18px">
+        <div class="tile accent"><div class="k">Rounds replayed</div><div class="v">60,000,000</div><div class="foot">6 seed pairs × 10M</div></div>
+        <div class="tile"><div class="k">Statistical tests</div><div class="v">124</div><div class="foot">per run, each for a pattern</div></div>
+        <div class="tile good"><div class="k">Patterns found</div><div class="v">0</div><div class="foot">none beat the odds</div></div>
+        <div class="tile bad"><div class="k">House edge</div><div class="v">1%</div><div class="foot">on every target, always</div></div>
+      </div>
+      <p style="font-weight:600;margin:0 0 10px;font-size:.9rem">Largest deviation found — Limbo versus pure cryptographic noise</p>
+      <div class="scoreboard" style="margin-bottom:18px">
+        <div class="sb-row"><span><span class="sb-label">Real Limbo results</span> <span class="sb-sub">60M rounds, pooled</span></span><span class="sb-z">|z| 2.67</span><span class="sb-sub">looks random</span></div>
+        <div class="sb-row"><span><span class="sb-label">AES-256 noise (control)</span> <span class="sb-sub">same tests, known-random</span></span><span class="sb-z">|z| 3.28</span><span class="sb-sub">looks random</span></div>
+        <div class="sb-row highlight"><span><span class="sb-label">A real 1-point edge would score</span> <span class="sb-sub">if one existed at 2.00×</span></span><span class="sb-z">z = 155</span><span class="sb-sub">never seen</span></div>
+      </div>
+      <div class="prose">
+        <p><strong>Limbo scored no higher than pure noise.</strong> Its biggest apparent "pattern" (|z| 2.67) was actually smaller than the one the random control threw up (|z| 3.28) — both are ordinary luck across 124 tests. When the most extreme results from one seed pair were re-checked on five others, <strong>none repeated</strong>.</p>
+        <p>To prove the tests can find a pattern, a fake one was planted — a win made 2 points likelier after a loss. A neural network caught it instantly (z ≈ 16). Run on the <strong>real</strong> results, the same network scored z ≈ 1.2: nothing to learn.</p>
+        <p>This is what "provably fair" buys you: not a way to win, but a way to <strong>check you weren't cheated</strong>. Use the Verify tab for exactly that.</p>
+      </div>
+    </div>
+    <div class="card" style="background:var(--surface-2)">
+      <div class="banner warn" style="background:var(--bad-soft);margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg><div><span class="b-head" style="color:var(--bad)">The edge is mathematical, not beatable.</span> <span class="b-body">No seed, streak, system, or model changes the 1% the house keeps on average. This tool is for verification and understanding the odds — not a betting strategy. If gambling stops being fun, step away.</span></div></div>
+    </div>
+  </section>
+
+  <footer>
+    Runs the exact <code>limbo-core.js</code> and <code>limbo-sim.js</code> — the same code checked against the published verification vectors, Node's own crypto, and an exhaustive pass over all 2<sup>32</sup> draws. Everything is computed in your browser; nothing is sent anywhere.
+  </footer>
+</div>
+
+<script>
+/* limbo-core.js — inlined verbatim from src/ by build.js */
+/*!
+ * limbo-core
+ *
+ * Exact, dependency-free implementation of the provably fair Limbo result
+ * algorithm used by Stake-style casinos:
+ *
+ *   digest = HMAC-SHA256(key = serverSeed, message = `${clientSeed}:${nonce}:0`)
+ *   float  = first 4 digest bytes read as a base-256 fraction  (0 <= float < 1)
+ *   raw    = 1e8 / (floor(float * 1e8) + 1) * 0.99
+ *   result = max(floor(raw * 100) / 100, 1)
+ *
+ * The same file runs unchanged in Node (require) and in a browser (<script>).
+ * SHA-256 and HMAC are implemented here in plain JavaScript so that results can
+ * be replayed synchronously and in bulk; test/ checks them against node:crypto.
+ */
+(function (root, factory) {
+  'use strict';
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.LimboCore = factory();
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ *
+   * Bytes and hex
+   * ------------------------------------------------------------------ */
+
+  const encoder = new TextEncoder();
+  const utf8 = (s) => encoder.encode(String(s));
+
+  const HEX = '0123456789abcdef';
+  function toHex(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += HEX[bytes[i] >> 4] + HEX[bytes[i] & 15];
+    return s;
+  }
+  const isHex = (s) => typeof s === 'string' && s.length % 2 === 0 && /^[0-9a-fA-F]*$/.test(s);
+  function fromHex(s) {
+    if (!isHex(s)) throw new Error('not a hex string');
+    const out = new Uint8Array(s.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(s.substr(i * 2, 2), 16);
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * SHA-256 (FIPS 180-4)
+   * ------------------------------------------------------------------ */
+
+  const K = new Int32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+  ]);
+  const IV = new Int32Array([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ]);
+  const W = new Int32Array(64);
+
+  /** One SHA-256 compression: folds the 64-byte block at p[off..off+64) into state H. */
+  function compress(H, p, off) {
+    for (let i = 0; i < 16; i++) {
+      const j = off + (i << 2);
+      W[i] = (p[j] << 24) | (p[j + 1] << 16) | (p[j + 2] << 8) | p[j + 3];
+    }
+    for (let i = 16; i < 64; i++) {
+      const x = W[i - 15];
+      const y = W[i - 2];
+      const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+      const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+      W[i] = (W[i - 16] + s0 + W[i - 7] + s1) | 0;
+    }
+    let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K[i] + W[i]) | 0;
+      const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0;
+      d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+
+  const TAIL = new Uint8Array(128);
+
+  /**
+   * Absorb data[start..end) and the SHA-256 padding into H.
+   * totalLen is the length in bytes of the whole message, including anything
+   * that was compressed into H before this call (a multiple of 64 bytes).
+   */
+  function finish(H, data, start, end, totalLen) {
+    let off = start;
+    while (end - off >= 64) { compress(H, data, off); off += 64; }
+    const rem = end - off;
+    const tailLen = rem < 56 ? 64 : 128;
+    TAIL.fill(0, 0, tailLen);
+    for (let i = 0; i < rem; i++) TAIL[i] = data[off + i];
+    TAIL[rem] = 0x80;
+    const bitsHi = Math.floor(totalLen / 0x20000000);
+    const bitsLo = (totalLen * 8) % 4294967296;
+    TAIL[tailLen - 8] = (bitsHi >>> 24) & 255; TAIL[tailLen - 7] = (bitsHi >>> 16) & 255;
+    TAIL[tailLen - 6] = (bitsHi >>> 8) & 255;  TAIL[tailLen - 5] = bitsHi & 255;
+    TAIL[tailLen - 4] = (bitsLo >>> 24) & 255; TAIL[tailLen - 3] = (bitsLo >>> 16) & 255;
+    TAIL[tailLen - 2] = (bitsLo >>> 8) & 255;  TAIL[tailLen - 1] = bitsLo & 255;
+    compress(H, TAIL, 0);
+    if (tailLen === 128) compress(H, TAIL, 64);
+  }
+
+  function stateToBytes(H, out) {
+    for (let i = 0; i < 8; i++) {
+      const v = H[i];
+      out[i * 4] = v >>> 24; out[i * 4 + 1] = (v >>> 16) & 255;
+      out[i * 4 + 2] = (v >>> 8) & 255; out[i * 4 + 3] = v & 255;
+    }
+    return out;
+  }
+
+  /** SHA-256 of a Uint8Array (or of a string, taken as UTF-8). Returns 32 bytes. */
+  function sha256(input) {
+    const bytes = typeof input === 'string' ? utf8(input) : input;
+    const H = new Int32Array(IV);
+    finish(H, bytes, 0, bytes.length, bytes.length);
+    return stateToBytes(H, new Uint8Array(32));
+  }
+  const sha256Hex = (input) => toHex(sha256(input));
+
+  /* ------------------------------------------------------------------ *
+   * HMAC-SHA256 (RFC 2104)
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Pre-hash an HMAC key. The two pad blocks are compressed once here, so every
+   * later digest with the same key costs two compressions instead of four.
+   */
+  function hmacKey(key) {
+    let k = typeof key === 'string' ? utf8(key) : key;
+    if (k.length > 64) k = sha256(k);
+    const pad = new Uint8Array(64);
+    const inner = new Int32Array(IV);
+    const outer = new Int32Array(IV);
+    for (let i = 0; i < 64; i++) pad[i] = (i < k.length ? k[i] : 0) ^ 0x36;
+    compress(inner, pad, 0);
+    for (let i = 0; i < 64; i++) pad[i] ^= 0x36 ^ 0x5c;
+    compress(outer, pad, 0);
+    return { inner, outer };
+  }
+
+  const HS = new Int32Array(8);
+  const INNER = new Uint8Array(32);
+
+  /** HMAC of msg[0..len) under a key prepared by hmacKey(). Writes 32 bytes to out. */
+  function hmacInto(keyState, msg, len, out) {
+    HS.set(keyState.inner);
+    finish(HS, msg, 0, len, 64 + len);
+    stateToBytes(HS, INNER);
+    HS.set(keyState.outer);
+    finish(HS, INNER, 0, 32, 96);
+    return stateToBytes(HS, out);
+  }
+
+  /** HMAC-SHA256(key, message). Strings are taken as UTF-8. Returns 32 bytes. */
+  function hmacSha256(key, message) {
+    const msg = typeof message === 'string' ? utf8(message) : message;
+    return hmacInto(hmacKey(key), msg, msg.length, new Uint8Array(32));
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Limbo
+   * ------------------------------------------------------------------ */
+
+  const TWO32 = 4294967296;
+  /** Return-to-player factor. Stake's code names this constant `houseEdge`. */
+  const RTP = 0.99;
+  const SCALE = 1e8;
+  /** Largest result the formula can produce (float below 1e-8). */
+  const MAX_MULTIPLIER = 99000000;
+
+  /**
+   * The float is `b0/256 + b1/256^2 + b2/256^3 + b3/256^4`. Every term and every
+   * partial sum is exactly representable, so it equals uint32 / 2^32 exactly and
+   * there are exactly 2^32 possible floats.
+   */
+  const floatFromUint32 = (k) => k / TWO32;
+
+  /**
+   * Multiplier for one of the 2^32 possible floats. The operation order matches
+   * the client-side verification code, so the doubles are bit-identical.
+   *
+   * Note: Stake's public documentation prints `1e8 / (float * 1e8) * houseEdge`.
+   * That differs from this formula whenever the "+ 1" moves the second decimal,
+   * and badly for very small floats; the published test vectors only match the
+   * version below.
+   */
+  function multiplierFromUint32(k) {
+    const float = k / TWO32;
+    const floatPoint = SCALE / (Math.floor(float * SCALE) + 1) * RTP;
+    const crashPoint = Math.floor(floatPoint * 100) / 100;
+    return Math.max(crashPoint, 1);
+  }
+
+  /** The formula exactly as printed in the public documentation (for comparison only). */
+  function documentedMultiplierFromUint32(k) {
+    const float = k / TWO32;
+    const floatPoint = SCALE / (float * SCALE) * RTP;
+    const crashPoint = Math.floor(floatPoint * 100) / 100;
+    return Math.max(crashPoint, 1);
+  }
+
+  const limboMessage = (clientSeed, nonce) => `${clientSeed}:${nonce}:0`;
+
+  function checkNonce(nonce) {
+    if (!Number.isSafeInteger(nonce) || nonce < 0) throw new Error('nonce must be a non-negative integer');
+  }
+
+  /** Every intermediate value for a single bet, for step-by-step verification. */
+  function limboResult(serverSeed, clientSeed, nonce) {
+    checkNonce(nonce);
+    const message = limboMessage(clientSeed, nonce);
+    const digest = hmacSha256(serverSeed, message);
+    const uint32 = ((digest[0] << 24) | (digest[1] << 16) | (digest[2] << 8) | digest[3]) >>> 0;
+    const float = uint32 / TWO32;
+    const divisor = Math.floor(float * SCALE) + 1;
+    const floatPoint = SCALE / divisor * RTP;
+    return {
+      message,
+      hmacHex: toHex(digest),
+      bytes: [digest[0], digest[1], digest[2], digest[3]],
+      uint32,
+      float,
+      divisor,
+      floatPoint,
+      multiplier: multiplierFromUint32(uint32),
+    };
+  }
+
+  const DIGITS = new Uint8Array(20);
+
+  /**
+   * The raw 32-bit draw for `count` consecutive nonces starting at startNonce.
+   * This is the fast path: one prepared key, one reused message buffer.
+   */
+  function replayUint32(serverSeed, clientSeed, startNonce, count, out) {
+    checkNonce(startNonce);
+    if (!Number.isSafeInteger(count) || count < 0) throw new Error('count must be a non-negative integer');
+    const keyState = hmacKey(serverSeed);
+    const prefix = utf8(clientSeed + ':');
+    const msg = new Uint8Array(prefix.length + 22);
+    msg.set(prefix);
+    const digest = new Uint8Array(32);
+    const res = out || new Uint32Array(count);
+    for (let i = 0; i < count; i++) {
+      let n = startNonce + i;
+      let nd = 0;
+      do { DIGITS[nd++] = 48 + (n % 10); n = Math.floor(n / 10); } while (n > 0);
+      let len = prefix.length;
+      while (nd > 0) msg[len++] = DIGITS[--nd];
+      msg[len++] = 58; // ':'
+      msg[len++] = 48; // '0'  (cursor round 0: Limbo uses the first four bytes)
+      hmacInto(keyState, msg, len, digest);
+      res[i] = ((digest[0] << 24) | (digest[1] << 16) | (digest[2] << 8) | digest[3]) >>> 0;
+    }
+    return res;
+  }
+
+  /** Multipliers for `count` consecutive nonces starting at startNonce. */
+  function replay(serverSeed, clientSeed, startNonce, count) {
+    const raw = replayUint32(serverSeed, clientSeed, startNonce, count);
+    const out = new Float64Array(count);
+    for (let i = 0; i < count; i++) out[i] = multiplierFromUint32(raw[i]);
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Exact odds
+   * ------------------------------------------------------------------ */
+
+  /**
+   * How many of the 2^32 equally likely draws give a result >= target.
+   *
+   * multiplierFromUint32 never increases as k grows (each step of the formula is
+   * a monotone IEEE-754 operation), so the winning draws are exactly
+   * k = 0 .. winCount-1 and a binary search finds the boundary exactly.
+   * research/exact_enum.c confirms the monotonicity over all 2^32 draws.
+   */
+  function winCount(target) {
+    if (!(target > 1)) return TWO32;
+    if (multiplierFromUint32(0) < target) return 0;
+    let lo = 0;
+    let hi = TWO32 - 1;
+    while (lo < hi) {
+      const mid = lo + Math.ceil((hi - lo) / 2);
+      if (multiplierFromUint32(mid) >= target) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo + 1;
+  }
+
+  /** Exact chance that a round's result is >= target. */
+  const winProbability = (target) => winCount(target) / TWO32;
+
+  /** Exact odds for a target: win chance, return to player, house edge. */
+  function odds(target) {
+    const count = winCount(target);
+    const p = count / TWO32;
+    return { target, winCount: count, p, rtp: p * target, edge: 1 - p * target };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Seed commitment
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Does a revealed server seed match the hash that was shown while it was
+   * active? The casino hashes the seed's text; the raw-bytes reading of a hex
+   * seed is tried as well so a different convention is still recognised.
+   */
+  function checkCommitment(serverSeed, hashedServerSeed) {
+    const want = String(hashedServerSeed).trim().toLowerCase();
+    const seed = String(serverSeed).trim();
+    const asText = sha256Hex(seed);
+    if (asText === want) return { match: true, mode: 'text', computed: asText };
+    if (seed.length > 0 && isHex(seed)) {
+      const asBytes = sha256Hex(fromHex(seed));
+      if (asBytes === want) return { match: true, mode: 'bytes', computed: asBytes };
+    }
+    return { match: false, mode: null, computed: asText };
+  }
+
+  return {
+    // bytes
+    utf8, toHex, fromHex, isHex,
+    // hashing
+    sha256, sha256Hex, hmacKey, hmacInto, hmacSha256,
+    // limbo
+    TWO32, RTP, MAX_MULTIPLIER,
+    floatFromUint32, multiplierFromUint32, documentedMultiplierFromUint32,
+    limboMessage, limboResult, replayUint32, replay,
+    // odds
+    winCount, winProbability, odds,
+    // commitment
+    checkCommitment,
+  };
+});
+
+</script>
+<script>
+/* limbo-sim.js — inlined verbatim from src/ by build.js */
+/*!
+ * limbo-sim
+ *
+ * What can be computed about Limbo *without* the server seed: streak maths,
+ * betting-plan simulation, and a bench that tests "predictor" rules against
+ * real results. Everything is built on the exact odds from limbo-core.
+ */
+(function (root, factory) {
+  'use strict';
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./limbo-core.js'));
+  else root.LimboSim = factory(root.LimboCore);
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Core) {
+  'use strict';
+
+  /* ------------------------------------------------------------------ *
+   * Small numeric helpers
+   * ------------------------------------------------------------------ */
+
+  /** Chance that a standard normal value is at least |z| away from zero. */
+  function twoSidedP(z) {
+    const x = Math.abs(z) / Math.SQRT2;
+    // Abramowitz & Stegun 7.1.26, absolute error below 1.5e-7
+    const t = 1 / (1 + 0.3275911 * x);
+    const poly = ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
+    return Math.min(1, poly * Math.exp(-x * x));
+  }
+
+  /** Value at quantile q (0..1) of an ascending-sorted array. */
+  function quantile(sorted, q) {
+    if (sorted.length === 0) return NaN;
+    const pos = (sorted.length - 1) * q;
+    const lo = Math.floor(pos);
+    const hi = Math.ceil(pos);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Exact session outlook (binomial)
+   * ------------------------------------------------------------------ */
+
+  const LANCZOS = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+    1.5056327351493116e-7,
+  ];
+  /** Natural log of the gamma function (Lanczos approximation). */
+  function lgamma(x) {
+    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+    x -= 1;
+    let a = LANCZOS[0];
+    const t = x + 7.5;
+    for (let i = 1; i < 9; i++) a += LANCZOS[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+  }
+
+  function binomialPmf(n, p, k) {
+    return Math.exp(lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1) + k * Math.log(p) + (n - k) * Math.log(1 - p));
+  }
+
+  /** P(X >= kmin) for X ~ Binomial(n, p), with 0 < p < 1. */
+  function binomialTail(n, p, kmin) {
+    if (kmin <= 0) return 1;
+    if (kmin > n) return 0;
+    const odds = p / (1 - p);
+    const mode = Math.min(n, Math.floor((n + 1) * p));
+    let sum = 0;
+    // from the larger of the mode and kmin upward: terms only shrink
+    const start = Math.max(mode, kmin);
+    let term = binomialPmf(n, p, start);
+    for (let k = start; k <= n && term > 0; k++) {
+      sum += term;
+      term *= ((n - k) / (k + 1)) * odds;
+    }
+    // if kmin lies below the mode, add kmin..mode-1 walking down from the mode
+    if (kmin < mode) {
+      term = binomialPmf(n, p, mode - 1);
+      for (let k = mode - 1; k >= kmin && term > 0; k--) {
+        sum += term;
+        term *= (k / (n - k + 1)) / odds;
+      }
+    }
+    return Math.min(1, sum);
+  }
+
+  /** Smallest k with P(X <= k) >= prob for X ~ Binomial(n, p). */
+  function binomialQuantile(n, p, prob) {
+    let lo = 0;
+    let hi = n;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (1 - binomialTail(n, p, mid + 1) >= prob) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  }
+
+  /**
+   * What `bets` flat bets of one unit at `target` lead to. All figures are in
+   * units of one stake; nothing here is simulated.
+   *   ahead     chance of ending with a profit
+   *   low, high the 10th and 90th percentile of the result
+   */
+  function sessionOutlook(target, bets) {
+    const o = Core.odds(target);
+    // result = wins * target - bets. Compare in hundredths to stay in whole numbers.
+    const cents = Math.round(target * 100);
+    const net = (wins) => (wins * cents - bets * 100) / 100;
+    const need = Math.floor((bets * 100) / cents) + 1; // fewest wins that leave a profit
+    return {
+      target,
+      bets,
+      p: o.p,
+      edge: o.edge,
+      mean: -o.edge * bets,
+      winsToProfit: need,
+      ahead: binomialTail(bets, o.p, need),
+      low: net(binomialQuantile(bets, o.p, 0.1)),
+      high: net(binomialQuantile(bets, o.p, 0.9)),
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Losing streaks
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Chance of at least one run of `length` or more consecutive losses somewhere
+   * in `bets` independent bets that each win with probability p.
+   */
+  function runProbability(p, length, bets) {
+    if (length <= 0) return 1;
+    if (length > bets) return 0;
+    const q = 1 - p;
+    const qL = Math.pow(q, length);
+    // a[n] = chance of no such run in the first n bets
+    const a = new Float64Array(bets + 1);
+    for (let n = 0; n < length; n++) a[n] = 1;
+    a[length] = 1 - qL;
+    const c = p * qL;
+    for (let n = length + 1; n <= bets; n++) a[n] = a[n - 1] - c * a[n - length - 1];
+    return Math.min(1, Math.max(0, 1 - a[bets]));
+  }
+
+  /**
+   * The longest losing streak that still has at least `chance` probability of
+   * showing up within `bets` bets.
+   */
+  function longestStreak(p, bets, chance) {
+    let lo = 0;
+    let hi = bets;
+    while (lo < hi) {
+      const mid = lo + Math.ceil((hi - lo) / 2);
+      if (runProbability(p, mid, bets) >= chance) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Random draws
+   * ------------------------------------------------------------------ */
+
+  /** Reproducible 32-bit generator (sfc32) for tests and repeatable demos. */
+  function seededRng(seed) {
+    let a = 0x9e3779b9, b = 0x243f6a88, c = 0xb7e15162, d = seed >>> 0;
+    const next = () => {
+      a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+      const t = (a + b + d) | 0;
+      d = (d + 1) | 0;
+      a = b ^ (b >>> 9);
+      b = (c + (c << 3)) | 0;
+      c = (c << 21) | (c >>> 11);
+      c = (c + t) | 0;
+      return t >>> 0;
+    };
+    for (let i = 0; i < 16; i++) next();
+    return next;
+  }
+
+  /** Cryptographically strong 32-bit draws, the same quality the casino's HMAC gives. */
+  function cryptoRng() {
+    const buf = new Uint32Array(8192);
+    let i = buf.length;
+    return () => {
+      if (i === buf.length) { globalThis.crypto.getRandomValues(buf); i = 0; }
+      return buf[i++];
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Betting-plan simulation
+   * ------------------------------------------------------------------ */
+
+  const DEFAULT_PLAN = {
+    balance: 1000,
+    baseBet: 1,
+    target: 2,
+    onWin: { action: 'reset', percent: 0 },
+    onLoss: { action: 'reset', percent: 0 },
+    maxBets: 1000,
+    stopProfit: 0,
+    stopLoss: 0,
+  };
+
+  function normalizePlan(plan) {
+    const p = Object.assign({}, DEFAULT_PLAN, plan);
+    p.onWin = Object.assign({}, DEFAULT_PLAN.onWin, plan && plan.onWin);
+    p.onLoss = Object.assign({}, DEFAULT_PLAN.onLoss, plan && plan.onLoss);
+    const bad = (msg) => { throw new Error(msg); };
+    if (!(p.balance > 0)) bad('balance must be greater than 0');
+    if (!(p.baseBet > 0)) bad('base bet must be greater than 0');
+    if (!(p.target >= 1.01)) bad('target must be at least 1.01');
+    if (!Number.isInteger(p.maxBets) || p.maxBets < 1) bad('number of bets must be a whole number of at least 1');
+    for (const side of [p.onWin, p.onLoss]) {
+      if (side.action !== 'reset' && side.action !== 'increase') bad("action must be 'reset' or 'increase'");
+      if (side.action === 'increase' && !(side.percent > -100)) bad('percent change must be above -100');
+    }
+    if (p.stopProfit < 0 || p.stopLoss < 0) bad('stop limits cannot be negative');
+    return p;
+  }
+
+  /**
+   * Play one session of a betting plan.
+   * `draw` returns uniform 32-bit integers; a bet wins when the draw is below
+   * `winDraws` (= Core.winCount(target)), which reproduces the exact win chance.
+   * Ends when the bets run out, a stop limit is hit, or the next bet cannot be
+   * covered ('bust').
+   */
+  function simulateSession(plan, draw, winDraws, recordPath) {
+    let balance = plan.balance;
+    let bet = plan.baseBet;
+    let bets = 0, wins = 0, wagered = 0, maxBet = 0, lowest = balance;
+    let lossStreak = 0, longestLossStreak = 0;
+    let reason = 'bets';
+    const path = recordPath ? [balance] : null;
+    while (bets < plan.maxBets) {
+      if (bet > balance) { reason = 'bust'; break; }
+      balance -= bet;
+      wagered += bet;
+      bets++;
+      if (bet > maxBet) maxBet = bet;
+      if (draw() < winDraws) {
+        balance += bet * plan.target;
+        wins++;
+        lossStreak = 0;
+        bet = plan.onWin.action === 'reset' ? plan.baseBet : bet * (1 + plan.onWin.percent / 100);
+      } else {
+        lossStreak++;
+        if (lossStreak > longestLossStreak) longestLossStreak = lossStreak;
+        bet = plan.onLoss.action === 'reset' ? plan.baseBet : bet * (1 + plan.onLoss.percent / 100);
+      }
+      if (balance < lowest) lowest = balance;
+      if (path) path.push(balance);
+      const net = balance - plan.balance;
+      if (plan.stopProfit > 0 && net >= plan.stopProfit) { reason = 'profit'; break; }
+      if (plan.stopLoss > 0 && -net >= plan.stopLoss) { reason = 'loss'; break; }
+    }
+    return { final: balance, net: balance - plan.balance, bets, wins, wagered, maxBet, lowest, longestLossStreak, reason, path };
+  }
+
+  /** Collects session results and turns them into summary statistics. */
+  function createTally(plan, samplePaths) {
+    const finals = [];
+    const paths = [];
+    const reasons = { bets: 0, profit: 0, loss: 0, bust: 0 };
+    let wagered = 0, bets = 0, net = 0, ahead = 0, behind = 0, maxBet = 0, longest = 0;
+    return {
+      wantsPath: () => paths.length < samplePaths,
+      add(s) {
+        finals.push(s.final);
+        reasons[s.reason]++;
+        wagered += s.wagered;
+        bets += s.bets;
+        net += s.net;
+        if (s.net > 0) ahead++; else if (s.net < 0) behind++;
+        if (s.maxBet > maxBet) maxBet = s.maxBet;
+        if (s.longestLossStreak > longest) longest = s.longestLossStreak;
+        if (s.path && paths.length < samplePaths) paths.push(s.path);
+      },
+      get count() { return finals.length; },
+      summary() {
+        const n = finals.length;
+        const sorted = Float64Array.from(finals).sort();
+        const edge = Core.odds(plan.target).edge;
+        return {
+          sessions: n,
+          aheadRate: ahead / n,
+          behindRate: behind / n,
+          bustRate: reasons.bust / n,
+          reasons: Object.assign({}, reasons),
+          final: {
+            mean: plan.balance + net / n,
+            min: sorted[0],
+            p5: quantile(sorted, 0.05),
+            p25: quantile(sorted, 0.25),
+            median: quantile(sorted, 0.5),
+            p75: quantile(sorted, 0.75),
+            p95: quantile(sorted, 0.95),
+            max: sorted[n - 1],
+          },
+          meanBets: bets / n,
+          meanWagered: wagered / n,
+          meanNet: net / n,
+          // what the house edge alone predicts for this much wagering
+          expectedNet: -edge * (wagered / n),
+          largestBet: maxBet,
+          longestLossStreak: longest,
+          finals: sorted,
+          paths,
+        };
+      },
+    };
+  }
+
+  /** Run many sessions of a plan and summarise them. */
+  function monteCarlo(plan, sessions, draw, samplePaths) {
+    const p = normalizePlan(plan);
+    const winDraws = Core.winCount(p.target);
+    const tally = createTally(p, samplePaths === undefined ? 6 : samplePaths);
+    const next = draw || cryptoRng();
+    for (let i = 0; i < sessions; i++) tally.add(simulateSession(p, next, winDraws, tally.wantsPath()));
+    return tally.summary();
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Pattern bench: do "predictor" rules beat the odds on real results?
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Each rule looks only at results that came before a round and decides
+   * whether to bet on it. If results were predictable from history, some rule
+   * would pick rounds that win more often than the rounds it skips.
+   *
+   * Per rule the bench reports how many rounds it bet and won, plus two scores
+   * in standard errors:
+   *   zOdds - its win rate against the exact chance p. This moves with the luck
+   *           of the whole sample, so every rule shares it.
+   *   zPick - its win rate against the rounds it skipped. This is the test of
+   *           prediction: it is zero on average unless the rule really selects
+   *           better rounds. |zPick| below about 2 is ordinary luck.
+   */
+  function predictorBench(mult, target) {
+    const p = Core.winProbability(target);
+    const n = mult.length;
+    const dueShort = Math.max(2, Math.round(1 / p));
+    const dueLong = Math.max(4, Math.ceil(3 / p));
+    const win10 = Math.max(10, Math.ceil(10 / p));
+    const expectedInWindow = p * win10;
+    const MIN_PATTERN = 50;
+
+    const rules = [
+      { id: 'always', name: 'Bet every round', note: 'The baseline. No prediction at all.' },
+      { id: 'after_loss', name: 'Bet only after a loss', note: 'The idea that a win tends to follow a loss.' },
+      { id: 'after_win', name: 'Bet only after a win', note: 'The idea that wins come in clusters.' },
+      { id: 'due_short', name: `Bet after ${dueShort} losses in a row`, note: 'The idea that a win is "due".' },
+      { id: 'due_long', name: `Bet after ${dueLong} losses in a row`, note: 'The same idea after a long dry spell.' },
+      { id: 'after_big', name: 'Bet right after a 10x or higher', note: 'The idea that big results cluster.' },
+      { id: 'after_lows', name: 'Bet after two results under 1.20x', note: 'The idea that a high result follows early crashes.' },
+      { id: 'cold', name: `Bet when the last ${win10} rounds ran cold`, note: 'Fewer recent wins than the odds predict.' },
+      { id: 'hot', name: `Bet when the last ${win10} rounds ran hot`, note: 'More recent wins than the odds predict.' },
+      { id: 'markov', name: 'Self-learning pattern matcher', note: 'Learns win rates after every 4-round win/loss pattern and bets on the best ones.' },
+      { id: 'odd', name: 'Bet odd-numbered rounds only', note: 'A placebo: it cannot matter.' },
+    ];
+    const R = rules.length;
+    const bets = new Float64Array(R);
+    const wins = new Float64Array(R);
+
+    let lossStreak = 0;
+    let prevWin = false;
+    let prev = NaN, prev2 = NaN;
+    const ring = new Uint8Array(win10);
+    let winsInWindow = 0;
+    let pattern = 0;
+    const seen = new Float64Array(16);
+    const won = new Float64Array(16);
+    let totalWon = 0;
+
+    for (let i = 0; i < n; i++) {
+      const m = mult[i];
+      const win = m >= target ? 1 : 0;
+
+      // decisions: only information from rounds before i
+      const take = (r) => { bets[r]++; wins[r] += win; };
+      take(0);
+      if (i >= 1) {
+        if (!prevWin) take(1); else take(2);
+        if (prev >= 10) take(5);
+      }
+      if (lossStreak >= dueShort) take(3);
+      if (lossStreak >= dueLong) take(4);
+      if (i >= 2 && prev < 1.2 && prev2 < 1.2) take(6);
+      if (i >= win10) {
+        if (winsInWindow < expectedInWindow) take(7);
+        else if (winsInWindow > expectedInWindow) take(8);
+      }
+      if (i >= 4 && seen[pattern] >= MIN_PATTERN && won[pattern] / seen[pattern] > totalWon / i) take(9);
+      if (i % 2 === 0) take(10);
+
+      // update state with round i
+      if (i >= 4) { seen[pattern]++; won[pattern] += win; }
+      pattern = ((pattern << 1) | win) & 15;
+      totalWon += win;
+      const slot = i % win10;
+      winsInWindow += win - ring[slot];
+      ring[slot] = win;
+      lossStreak = win ? 0 : lossStreak + 1;
+      prevWin = win === 1;
+      prev2 = prev;
+      prev = m;
+    }
+
+    const allWins = wins[0];
+    const overall = n > 0 ? allWins / n : NaN;
+    let maxAbsZ = 0;
+    const rows = rules.map((rule, r) => {
+      const b = bets[r];
+      const w = wins[r];
+      const skipped = n - b;
+      const skippedWins = allWins - w;
+      const zOdds = b * p >= 5 && b * (1 - p) >= 5 ? (w - b * p) / Math.sqrt(b * p * (1 - p)) : NaN;
+      // two-proportion test: the rounds this rule bet versus the rounds it skipped
+      const testable = b * overall >= 5 && skipped * overall >= 5 && b * (1 - overall) >= 5 && skipped * (1 - overall) >= 5;
+      const zPick = testable
+        ? (w / b - skippedWins / skipped) / Math.sqrt(overall * (1 - overall) * (1 / b + 1 / skipped))
+        : NaN;
+      if (testable && Math.abs(zPick) > maxAbsZ) maxAbsZ = Math.abs(zPick);
+      return {
+        id: rule.id,
+        name: rule.name,
+        note: rule.note,
+        bets: b,
+        wins: w,
+        hitRate: b > 0 ? w / b : NaN,
+        // win rate minus the win rate of every round in the sample
+        lift: b > 0 ? w / b - overall : NaN,
+        zOdds,
+        zPick,
+        luck: testable ? twoSidedP(zPick) : NaN,
+        // flat one-unit bets: each win pays target-1, each loss costs 1
+        profit: w * (target - 1) - (b - w),
+      };
+    });
+    return { target, p, rounds: n, overall, rules: rows, maxAbsZ };
+  }
+
+  /** Observed versus exact win rate for a list of targets. */
+  function frequencyTable(mult, targets) {
+    return targets.map((target) => {
+      let hits = 0;
+      for (let i = 0; i < mult.length; i++) if (mult[i] >= target) hits++;
+      const p = Core.winProbability(target);
+      const n = mult.length;
+      return {
+        target,
+        hits,
+        observed: n > 0 ? hits / n : NaN,
+        expected: p,
+        z: n * p >= 5 ? (hits - n * p) / Math.sqrt(n * p * (1 - p)) : NaN,
+      };
+    });
+  }
+
+  return {
+    twoSidedP, quantile,
+    lgamma, binomialTail, binomialQuantile, sessionOutlook,
+    runProbability, longestStreak,
+    seededRng, cryptoRng,
+    DEFAULT_PLAN, normalizePlan, simulateSession, createTally, monteCarlo,
+    predictorBench, frequencyTable,
+  };
+});
+
+</script>
+<script>
+/* ---- Limbo Verifier UI. Depends on the inlined LimboCore / LimboSim globals. ---- */
+(function () {
+  "use strict";
+  var Core = window.LimboCore, Sim = window.LimboSim;
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  /* ---- formatting ---- */
+  function fmt(x, d) { return Number(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function mult(x) { return fmt(x, 2) + "×"; }
+  function pct(p, d) { if (d == null) d = 4; return (p * 100).toFixed(d) + "%"; }
+  function esc(s) { return String(s); }
+
+  /* ---- theme ---- */
+  (function theme() {
+    var root = document.documentElement;
+    try { var saved = localStorage.getItem("limbo-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+    $("themeBtn").addEventListener("click", function () {
+      var dark = getComputedStyle(root).getPropertyValue("color-scheme").indexOf("dark") >= 0;
+      var next = dark ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("limbo-theme", next); } catch (e) {}
+    });
+  })();
+
+  /* ---- tabs ---- */
+  (function tabs() {
+    var ids = ["verify", "odds", "reality"];
+    ids.forEach(function (name) {
+      $("tab-" + name).addEventListener("click", function () {
+        ids.forEach(function (other) {
+          var sel = other === name;
+          $("tab-" + other).setAttribute("aria-selected", sel ? "true" : "false");
+          $("panel-" + other).hidden = !sel;
+        });
+        if (name === "reality") drawDistribution();
+      });
+    });
+  })();
+
+  /* ============================ VERIFY ============================ */
+  function svgIcon(ok) {
+    return ok
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  }
+
+  function stepsFor(r, target) {
+    var wrap = el("div", "steps");
+    var hex = r.hmacHex, firstHex = hex.slice(0, 8);
+    // codeHtml is trusted markup we build here; codeText is set safely via textContent.
+    function step(n, title, desc, codeHtml, codeText) {
+      var s = el("div", "step");
+      s.appendChild(el("div", "num", String(n)));
+      var body = el("div", "step-body");
+      body.appendChild(el("div", "t", title));
+      if (desc) body.appendChild(el("div", "d", desc));
+      if (codeHtml != null) { var c = el("div", "code"); c.innerHTML = codeHtml; body.appendChild(c); }
+      else if (codeText != null) { var c2 = el("div", "code"); c2.textContent = codeText; body.appendChild(c2); }
+      s.appendChild(body);
+      return s;
+    }
+    wrap.appendChild(step(1, "Build the message", "The client seed, the nonce, and a 0 for the first draw of the round.",
+      '<span class="hl">' + esc(r.message) + '</span>'));
+    wrap.appendChild(step(2, "HMAC-SHA256", "Keyed with the server seed. The first 4 bytes (8 hex digits) are the draw.",
+      '<span class="hl">' + firstHex + '</span><span class="dim">' + hex.slice(8) + '</span>'));
+    wrap.appendChild(step(3, "Bytes to a fraction", "Those 4 bytes read as a number between 0 and 1.", null,
+      "bytes   [ " + r.bytes.join(", ") + " ]\n" +
+      "float   = " + r.bytes[0] + "/256 + " + r.bytes[1] + "/256² + " + r.bytes[2] + "/256³ + " + r.bytes[3] + "/256⁴\n" +
+      "        = " + r.float));
+    wrap.appendChild(step(4, "Apply the formula", "Floor to a whole number of 1e-8 steps, divide into 1e8, keep 99% (the house edge), floor to 2 decimals.", null,
+      "1e8 / (floor(float × 1e8) + 1) × 0.99\n" +
+      "= 1e8 / " + fmt(r.divisor, 0) + " × 0.99\n" +
+      "= " + r.floatPoint + "\n" +
+      "→ floor to 2 decimals, min 1.00"));
+    var chipWrap = el("div", "step");
+    chipWrap.appendChild(el("div", "num", "5"));
+    var cb = el("div", "step-body");
+    cb.appendChild(el("div", "t", "Result"));
+    var isWin = isFinite(target) && r.multiplier >= target;
+    var chip = el("div", "result-chip " + (isFinite(target) ? (isWin ? "win" : "loss") : ""));
+    chip.appendChild(el("span", "v", mult(r.multiplier)));
+    if (isFinite(target)) chip.appendChild(el("span", "w", isWin ? ("win at " + mult(target)) : ("below " + mult(target))));
+    cb.appendChild(chip);
+    chipWrap.appendChild(cb);
+    wrap.appendChild(chipWrap);
+    return wrap;
+  }
+
+  function runVerify() {
+    var errBox = $("v-error"); errBox.hidden = true;
+    var out = $("v-output"); out.innerHTML = "";
+    var server = $("v-server").value.trim();
+    var client = $("v-client").value;
+    var nonce = parseInt($("v-nonce").value, 10);
+    var count = parseInt($("v-count").value, 10);
+    var hash = $("v-hash").value.trim();
+    var target = parseFloat($("v-target").value);
+    if (!server) { return showErr(errBox, "Enter the revealed server seed."); }
+    if (!(nonce >= 0)) { return showErr(errBox, "Nonce must be 0 or more."); }
+    if (!(count >= 1)) { count = 1; }
+    if (count > 100000) { return showErr(errBox, "Keep rounds at 100,000 or fewer."); }
+
+    // commitment
+    if (hash) {
+      var c = Core.checkCommitment(server, hash);
+      var b = el("div", "banner " + (c.match ? "ok" : "no"));
+      b.innerHTML = svgIcon(c.match);
+      var txt = el("div");
+      if (c.match) {
+        txt.innerHTML = '<span class="b-head">Commitment verified.</span> <span class="b-body">SHA-256 of this server seed equals the hash you were shown' + (c.mode === "bytes" ? " (hashed as raw bytes)" : "") + ", so the casino was locked into these results before you played.</span>";
+      } else {
+        txt.innerHTML = '<span class="b-head">Commitment does not match.</span> <span class="b-body">SHA-256 of this seed is <span class="mono-cell">' + c.computed + '</span>, which differs from the hash entered. Double-check you copied both correctly.</span>';
+      }
+      b.appendChild(txt);
+      out.appendChild(b);
+    }
+
+    var r0;
+    try { r0 = Core.limboResult(server, client, nonce); }
+    catch (e) { return showErr(errBox, e.message); }
+
+    if (count === 1) {
+      var card = el("div", "card");
+      card.appendChild(el("h2", null, "Round " + fmt(nonce, 0)));
+      card.appendChild(stepsFor(r0, target));
+      out.appendChild(card);
+    } else {
+      renderRange(out, server, client, nonce, count, target);
+    }
+  }
+
+  function renderRange(out, server, client, nonce, count, target) {
+    var results = Core.replay(server, client, nonce, count);
+    var wins = 0, highest = 0, hi = 0;
+    for (var i = 0; i < count; i++) { if (results[i] > highest) { highest = results[i]; hi = nonce + i; } if (isFinite(target) && results[i] >= target) wins++; }
+
+    var tiles = el("div", "card");
+    var tg = el("div", "tiles");
+    tg.appendChild(tile("Rounds", fmt(count, 0), "nonces " + fmt(nonce,0) + "–" + fmt(nonce + count - 1, 0)));
+    tg.appendChild(tile("Highest", mult(highest), "at nonce " + fmt(hi, 0), "accent"));
+    if (isFinite(target)) {
+      tg.appendChild(tile("Wins at " + mult(target), fmt(wins, 0), pct(wins / count, 2) + " of rounds"));
+      tg.appendChild(tile("Exact chance", pct(Core.winProbability(target), 2), "what the odds predict", "good"));
+    }
+    tiles.appendChild(tg);
+    out.appendChild(tiles);
+
+    var card = el("div", "card");
+    card.appendChild(el("h2", null, "Every round"));
+    var shown = Math.min(count, 500);
+    if (count > shown) card.appendChild(el("p", "sub", "First " + fmt(shown, 0) + " of " + fmt(count, 0) + " shown. All " + fmt(count,0) + " are counted in the totals above."));
+    var tw = el("div", "table-wrap"); tw.style.maxHeight = "440px"; tw.style.overflowY = "auto";
+    var t = el("table");
+    t.innerHTML = "<thead><tr><th>Nonce</th><th class='num-cell'>Result</th>" + (isFinite(target) ? "<th>At " + mult(target) + "</th>" : "") + "<th>Draw (hex)</th></tr></thead>";
+    var tb = el("tbody");
+    for (var j = 0; j < shown; j++) {
+      var rr = Core.limboResult(server, client, nonce + j);
+      var tr = el("tr");
+      tr.appendChild(el("td", null, fmt(nonce + j, 0)));
+      var vd = el("td", "num-cell"); vd.textContent = mult(rr.multiplier);
+      tr.appendChild(vd);
+      if (isFinite(target)) {
+        var w = el("td");
+        var won = rr.multiplier >= target;
+        var pill = el("span", "pill " + (won ? "win" : "loss"), won ? "win" : "—");
+        w.appendChild(pill); tr.appendChild(w);
+      }
+      tr.appendChild(el("td", "mono-cell", rr.hmacHex.slice(0, 8)));
+      tb.appendChild(tr);
+    }
+    t.appendChild(tb); tw.appendChild(t); card.appendChild(tw);
+    out.appendChild(card);
+  }
+
+  function tile(k, v, foot, cls) {
+    var t = el("div", "tile" + (cls ? " " + cls : ""));
+    t.appendChild(el("div", "k", k));
+    t.appendChild(el("div", "v", v));
+    if (foot) t.appendChild(el("div", "foot", foot));
+    return t;
+  }
+  function showErr(box, msg) { box.textContent = msg; box.hidden = false; }
+
+  /* ============================ ODDS ============================ */
+  function runOdds() {
+    var errBox = $("o-error"); errBox.hidden = true;
+    var out = $("o-output"); out.innerHTML = "";
+    var target = parseFloat($("o-target").value);
+    var bets = parseInt($("o-bets").value, 10);
+    if (!(target >= 1.01)) return showErr(errBox, "Target must be at least 1.01.");
+    if (!(bets >= 1)) bets = 1000;
+    var o = Core.odds(target);
+    if (o.winCount === 0) return showErr(errBox, "No result can reach " + mult(target) + ". The largest possible is " + mult(Core.MAX_MULTIPLIER) + ".");
+
+    var c1 = el("div", "card");
+    c1.appendChild(el("h2", null, "The odds"));
+    var tg = el("div", "tiles");
+    tg.appendChild(tile("Win chance", pct(o.p, 4), "about 1 in " + fmt(1 / o.p, 2) + " rounds", "accent"));
+    tg.appendChild(tile("A win pays", fmt(target, 2) + "×", "profit of " + fmt(target - 1, 2) + " per 1 staked"));
+    tg.appendChild(tile("Return to player", pct(o.rtp, 3), "of everything wagered"));
+    tg.appendChild(tile("House edge", pct(o.edge, 3), fmt(o.edge * 1000, 2) + " lost per 1,000 wagered", "bad"));
+    c1.appendChild(tg);
+    c1.appendChild(el("p", "note", "Win chance × target = 99% at every target you can pick. That 1% is the whole game; it never changes with streaks or systems."));
+    out.appendChild(c1);
+
+    // session outlook
+    var ses = Sim.sessionOutlook(target, bets);
+    var c2 = el("div", "card");
+    c2.appendChild(el("h2", null, "A session of " + fmt(bets, 0) + " flat bets"));
+    c2.appendChild(el("p", "sub", "Betting 1 unit each time. Exact, from the binomial distribution — not a simulation."));
+    var tg2 = el("div", "tiles");
+    tg2.appendChild(tile("Chance you end ahead", pct(ses.ahead, 2), "need " + fmt(ses.winsToProfit, 0) + "+ wins", ses.ahead >= 0.5 ? "good" : "bad"));
+    tg2.appendChild(tile("Average result", (ses.mean >= 0 ? "+" : "") + fmt(ses.mean, 1), "units, the edge × wagered", "bad"));
+    tg2.appendChild(tile("Typical range", fmt(ses.low, 0) + " to " + fmt(ses.high, 0), "middle 80% of sessions"));
+    c2.appendChild(tg2);
+    out.appendChild(c2);
+
+    // streaks
+    var c3 = el("div", "card");
+    c3.appendChild(el("h2", null, "Losing streaks to expect"));
+    c3.appendChild(el("p", "sub", "Over " + fmt(bets, 0) + " bets at this target. The longer you play, the longer the dry spells you will certainly hit."));
+    var tw = el("div", "table-wrap"); var t = el("table");
+    t.innerHTML = "<thead><tr><th>How often</th><th class='num-cell'>Longest run of losses</th></tr></thead>";
+    var tb = el("tbody");
+    [[0.5, "More likely than not"], [0.05, "1 session in 20"], [0.01, "1 session in 100"]].forEach(function (row) {
+      var L = Sim.longestStreak(o.p, bets, row[0]);
+      var tr = el("tr");
+      tr.appendChild(el("td", null, row[1]));
+      tr.appendChild(el("td", "num-cell", L + " in a row"));
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); tw.appendChild(t); c3.appendChild(tw);
+    out.appendChild(c3);
+  }
+
+  /* ============================ DISTRIBUTION ============================ */
+  var distDrawn = false;
+  function drawDistribution() {
+    if (distDrawn) return; distDrawn = true;
+    var cuts = [1.01, 1.5, 2, 3, 5, 10, 100, 1000];
+    var labels = ["exactly 1.00×", "1.01× – 1.49×", "1.50× – 1.99×", "2× – 2.99×", "3× – 4.99×", "5× – 9.99×", "10× – 99×", "100× – 999×", "1000× +"];
+    var shares = [], acc = 1;
+    for (var i = 0; i < cuts.length; i++) { var p = Core.winProbability(cuts[i]); shares.push(acc - p); acc = p; }
+    shares.push(acc);
+    var max = Math.max.apply(null, shares);
+    var chart = $("dist-chart"); chart.innerHTML = "";
+    shares.forEach(function (s, i) {
+      var row = el("div", "dist-row");
+      row.appendChild(el("div", "name", labels[i]));
+      var track = el("div", "dist-track");
+      var bar = el("div", "dist-bar");
+      bar.style.width = "0%";
+      track.appendChild(bar);
+      row.appendChild(track);
+      var pctTxt = s * 100 >= 0.1 ? (s * 100).toFixed(2) + "%" : (s * 100).toFixed(3) + "%";
+      row.appendChild(el("div", "pct", pctTxt));
+      chart.appendChild(row);
+      requestAnimationFrame(function () { bar.style.width = (s / max * 100) + "%"; });
+    });
+  }
+
+  /* ============================ wire up + initial state ============================ */
+  $("v-run").addEventListener("click", runVerify);
+  $("o-target").addEventListener("input", debounce(runOdds, 120));
+  $("o-bets").addEventListener("input", debounce(runOdds, 120));
+  ["v-server","v-client","v-nonce","v-count","v-hash","v-target"].forEach(function (id) {
+    $(id).addEventListener("keydown", function (e) { if (e.key === "Enter") runVerify(); });
+  });
+  function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  // Open in a realistic working state: the published verification vectors, already solved.
+  $("v-server").value = "server seed";
+  $("v-client").value = "client seed";
+  $("v-hash").value = Core.sha256Hex("server seed");
+  $("v-nonce").value = "1";
+  $("v-count").value = "1";
+  runVerify();
+  runOdds();
+})();
+</script>

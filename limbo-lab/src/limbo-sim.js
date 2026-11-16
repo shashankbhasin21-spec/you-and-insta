@@ -35,6 +35,91 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Exact session outlook (binomial)
+   * ------------------------------------------------------------------ */
+
+  const LANCZOS = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+    1.5056327351493116e-7,
+  ];
+  /** Natural log of the gamma function (Lanczos approximation). */
+  function lgamma(x) {
+    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+    x -= 1;
+    let a = LANCZOS[0];
+    const t = x + 7.5;
+    for (let i = 1; i < 9; i++) a += LANCZOS[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+  }
+
+  function binomialPmf(n, p, k) {
+    return Math.exp(lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1) + k * Math.log(p) + (n - k) * Math.log(1 - p));
+  }
+
+  /** P(X >= kmin) for X ~ Binomial(n, p), with 0 < p < 1. */
+  function binomialTail(n, p, kmin) {
+    if (kmin <= 0) return 1;
+    if (kmin > n) return 0;
+    const odds = p / (1 - p);
+    const mode = Math.min(n, Math.floor((n + 1) * p));
+    let sum = 0;
+    // from the larger of the mode and kmin upward: terms only shrink
+    const start = Math.max(mode, kmin);
+    let term = binomialPmf(n, p, start);
+    for (let k = start; k <= n && term > 0; k++) {
+      sum += term;
+      term *= ((n - k) / (k + 1)) * odds;
+    }
+    // if kmin lies below the mode, add kmin..mode-1 walking down from the mode
+    if (kmin < mode) {
+      term = binomialPmf(n, p, mode - 1);
+      for (let k = mode - 1; k >= kmin && term > 0; k--) {
+        sum += term;
+        term *= (k / (n - k + 1)) / odds;
+      }
+    }
+    return Math.min(1, sum);
+  }
+
+  /** Smallest k with P(X <= k) >= prob for X ~ Binomial(n, p). */
+  function binomialQuantile(n, p, prob) {
+    let lo = 0;
+    let hi = n;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (1 - binomialTail(n, p, mid + 1) >= prob) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  }
+
+  /**
+   * What `bets` flat bets of one unit at `target` lead to. All figures are in
+   * units of one stake; nothing here is simulated.
+   *   ahead     chance of ending with a profit
+   *   low, high the 10th and 90th percentile of the result
+   */
+  function sessionOutlook(target, bets) {
+    const o = Core.odds(target);
+    // result = wins * target - bets. Compare in hundredths to stay in whole numbers.
+    const cents = Math.round(target * 100);
+    const net = (wins) => (wins * cents - bets * 100) / 100;
+    const need = Math.floor((bets * 100) / cents) + 1; // fewest wins that leave a profit
+    return {
+      target,
+      bets,
+      p: o.p,
+      edge: o.edge,
+      mean: -o.edge * bets,
+      winsToProfit: need,
+      ahead: binomialTail(bets, o.p, need),
+      low: net(binomialQuantile(bets, o.p, 0.1)),
+      high: net(binomialQuantile(bets, o.p, 0.9)),
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
    * Losing streaks
    * ------------------------------------------------------------------ */
 
@@ -377,6 +462,7 @@
 
   return {
     twoSidedP, quantile,
+    lgamma, binomialTail, binomialQuantile, sessionOutlook,
     runProbability, longestStreak,
     seededRng, cryptoRng,
     DEFAULT_PLAN, normalizePlan, simulateSession, createTally, monteCarlo,

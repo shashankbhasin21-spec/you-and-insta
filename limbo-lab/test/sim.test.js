@@ -11,6 +11,82 @@ test('twoSidedP matches known normal tail values', () => {
   assert.ok(Math.abs(Sim.twoSidedP(3) - 0.0026998) < 1e-5);
 });
 
+test('lgamma matches factorials', () => {
+  let f = 0; // log(k!)
+  for (let k = 1; k <= 170; k++) {
+    f += Math.log(k);
+    assert.ok(Math.abs(Sim.lgamma(k + 1) - f) < 1e-9 * Math.max(1, f), `log(${k}!)`);
+  }
+  assert.ok(Math.abs(Sim.lgamma(0.5) - Math.log(Math.sqrt(Math.PI))) < 1e-12);
+});
+
+test('binomialTail agrees with a direct sum of exact terms', () => {
+  const choose = (n, k) => { let c = 1; for (let i = 0; i < k; i++) c = (c * (n - i)) / (i + 1); return c; };
+  for (const [n, p] of [[1, 0.3], [7, 0.495], [25, 0.099], [40, 0.9802], [60, 0.5]]) {
+    for (let kmin = -1; kmin <= n + 2; kmin++) {
+      let want = 0;
+      for (let k = Math.max(kmin, 0); k <= n; k++) want += choose(n, k) * p ** k * (1 - p) ** (n - k);
+      if (kmin <= 0) want = 1;
+      assert.ok(Math.abs(Sim.binomialTail(n, p, kmin) - want) < 1e-11, `n ${n}, p ${p}, kmin ${kmin}`);
+    }
+  }
+});
+
+test('binomialTail stays accurate for large sessions', () => {
+  // symmetric case: P(X >= n/2 + 1) + P(X <= n/2 - 1) + P(X = n/2) = 1 and the two tails are equal
+  const n = 100000;
+  const upper = Sim.binomialTail(n, 0.5, n / 2 + 1);
+  const atLeastHalf = Sim.binomialTail(n, 0.5, n / 2);
+  const middle = atLeastHalf - upper;
+  assert.ok(Math.abs(2 * upper + middle - 1) < 1e-9);
+  // normal approximation check far from the centre: P(Z > 3) = 0.0013499
+  const k = Math.round(n / 2 + 3 * Math.sqrt(n / 4));
+  assert.ok(Math.abs(Sim.binomialTail(n, 0.5, k) - 0.00135) < 0.0001);
+  assert.equal(Sim.binomialTail(1000000, 0.495, 0), 1);
+  assert.ok(Sim.binomialTail(1000000, 0.495, 1000000) >= 0);
+});
+
+test('binomialQuantile is the smallest k that reaches the probability', () => {
+  for (const [n, p] of [[10, 0.495], [200, 0.099], [5000, 0.66], [100000, 0.0099]]) {
+    for (const prob of [0.1, 0.5, 0.9]) {
+      const k = Sim.binomialQuantile(n, p, prob);
+      assert.ok(1 - Sim.binomialTail(n, p, k + 1) >= prob - 1e-12, `cdf(k) for n ${n}`);
+      if (k > 0) assert.ok(1 - Sim.binomialTail(n, p, k) < prob, `cdf(k-1) for n ${n}`);
+    }
+  }
+});
+
+test('sessionOutlook: exact chance of being ahead, checked by hand and by simulation', () => {
+  // 1 bet at 2x: ahead only if it wins
+  const one = Sim.sessionOutlook(2, 1);
+  assert.equal(one.winsToProfit, 1);
+  assert.ok(Math.abs(one.ahead - Core.winProbability(2)) < 1e-12);
+  // 2 bets at 2x: one win breaks even, so both must win
+  const two = Sim.sessionOutlook(2, 2);
+  assert.equal(two.winsToProfit, 2);
+  assert.ok(Math.abs(two.ahead - Core.winProbability(2) ** 2) < 1e-12);
+  // 11 bets at 1.1x: ten wins return exactly 11.00, so all eleven must win
+  assert.equal(Sim.sessionOutlook(1.1, 11).winsToProfit, 11);
+  // 10 bets at 100x: any single win is a profit
+  const long = Sim.sessionOutlook(100, 10);
+  assert.ok(Math.abs(long.ahead - (1 - (1 - Core.winProbability(100)) ** 10)) < 1e-12);
+
+  // against simulation: 1,000 bets at 2x and at 10x
+  for (const target of [2, 10]) {
+    const o = Sim.sessionOutlook(target, 1000);
+    const r = Sim.monteCarlo({ balance: 1e9, baseBet: 1, target, maxBets: 1000 }, 20000, Sim.seededRng(target + 40));
+    assert.ok(Math.abs(r.aheadRate - o.ahead) < 0.015, `target ${target}: simulated ${r.aheadRate}, exact ${o.ahead}`);
+    assert.ok(Math.abs(o.mean + 10) < 0.01);
+    // the 10th-90th percentile band should hold about 80% of simulated sessions
+    let inside = 0;
+    for (const f of r.finals) { const net = f - 1e9; if (net >= o.low && net <= o.high) inside++; }
+    assert.ok(inside / r.finals.length > 0.78 && inside / r.finals.length < 0.9, `band holds ${inside / r.finals.length}`);
+  }
+  // the longer the session, the smaller the chance of being ahead
+  const chances = [100, 1000, 10000, 100000].map((n) => Sim.sessionOutlook(2, n).ahead);
+  for (let i = 1; i < chances.length; i++) assert.ok(chances[i] < chances[i - 1]);
+});
+
 test('runProbability agrees with brute-force enumeration of every outcome', () => {
   const p = 0.37;
   for (const bets of [1, 4, 9, 14]) {
