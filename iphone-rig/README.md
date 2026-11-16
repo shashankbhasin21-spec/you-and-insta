@@ -41,12 +41,13 @@ engine   6 cores, 4.10 MH/s
 12:01:03  prize 3.142 BTC, 100% to you
 12:01:03  odds 1 in 4.88 billion per year
 12:01:21  accepted #1  diff 0.0312  212ms
-12:01:33  4.02 MH/s  A1 R0  best 0.0312
+12:01:33  4.02 MH/s  A1 R0  best 0.0312  diff 0.019
 ```
 
 `accepted` means the pool checked a piece of your work and it was correct.
 `A`/`R` count accepted and rejected shares. `best` is your luckiest hash so
-far; a block needs a `best` as big as `net diff`.
+far; a block needs a `best` as big as `net diff`. `diff` is the share
+difficulty the pool asks for.
 
 To stop, press Ctrl-C (a-Shell has a control key in the bar above its
 keyboard).
@@ -143,7 +144,7 @@ can close background apps that use a full core without pause.
 
 ## What has and has not been checked
 
-Checked, with `python3 -m unittest discover tests` (24 tests):
+Checked, with `python3 -m unittest discover tests` (25 tests):
 
 - Hashing against real Bitcoin data: the genesis block rebuilt from a
   Stratum-style job, block 125552, block 170's merkle root, and the address

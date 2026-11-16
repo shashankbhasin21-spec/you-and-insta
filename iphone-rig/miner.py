@@ -848,9 +848,9 @@ class Rig(object):
 
     def status(self):
         if self.state == "mining":
-            self.log("%s  A%d R%d  best %s" % (fmt_rate(self.rate(60) or self.rate(10)),
-                                             self.accepted, self.rejected,
-                                             fmt_diff(self.best)))
+            self.log("%s  A%d R%d  best %s  diff %s" % (
+                fmt_rate(self.rate(60) or self.rate(10)), self.accepted, self.rejected,
+                fmt_diff(self.best), fmt_diff(self.pool_diff) if self.pool_diff else "-"))
 
     def life(self):
         """All-time totals: what was on disk plus this run."""
@@ -1043,7 +1043,10 @@ class Rig(object):
                 time.sleep(0.2)
                 self.chores(pool, time.time())
                 continue
-            wanted = max(work[0].diff, pool.next_diff)
+            # Use the newest difficulty at once, as public-pool, cgminer and
+            # NerdMiner do. Waiting for the next job instead left the rig at
+            # public-pool's opening difficulty of 100000 for up to a minute.
+            wanted = pool.next_diff
             if wanted != diff:
                 diff = self.pool_diff = wanted
                 target = min(int(DIFF1 / diff), (1 << 256) - 1)

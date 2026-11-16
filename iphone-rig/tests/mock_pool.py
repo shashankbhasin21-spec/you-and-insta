@@ -42,13 +42,17 @@ def target_from_bits(nbits_hex):
 class MockPool(object):
     def __init__(self, pay_script, other_script=b"\x51", pay_fraction=1.0,
                  nbits="1702c4e4", reward=314159265, diff=0.0002, honor_suggest=False,
-                 job_every=1.5, drop_after=None, refuse_login=False, height=921000):
+                 job_every=1.5, drop_after=None, refuse_login=False, height=921000,
+                 suggest_sends_job=True, judge_by_session=False):
         self.pay_script, self.other_script = pay_script, other_script
         self.pay_fraction = pay_fraction
         self.nbits, self.reward = nbits, reward
         self.diff, self.honor_suggest = diff, honor_suggest
         self.job_every, self.drop_after = job_every, drop_after
         self.refuse_login = refuse_login
+        # public-pool answers a suggestion with set_difficulty only (no new
+        # job) and judges every share by the difficulty in force right now.
+        self.suggest_sends_job, self.judge_by_session = suggest_sends_job, judge_by_session
         self.height = height
         self.lock = threading.Lock()
         self.accepted = self.rejected = self.blocks = self.connections = self.submits = 0
@@ -143,7 +147,8 @@ class MockPool(object):
         header = header_like_nerdminer(job["version"], job["prev"], root, ntime,
                                        job["nbits"], int(nonce, 16))
         value = int.from_bytes(dsha(header), "little")
-        if value > int(DIFF1 / job["diff"]):
+        needed = session["diff"] if self.judge_by_session else job["diff"]
+        if value > int(DIFF1 / needed):
             return [23, "Low difficulty share", None]
         if value <= target_from_bits(job["nbits"]):
             with self.lock:
@@ -206,7 +211,7 @@ class MockPool(object):
                     if self.honor_suggest:
                         session["diff"] = float(params[0])
                         send({"id": None, "method": "mining.set_difficulty", "params": [session["diff"]]})
-                        if session["authorized"]:
+                        if session["authorized"] and self.suggest_sends_job:
                             send(self._job(session, True))
                 elif method == "mining.submit":
                     error = self._check(session, params)

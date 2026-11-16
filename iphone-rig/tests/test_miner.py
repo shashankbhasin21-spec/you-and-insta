@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 import urllib.error
 import urllib.request
 
@@ -249,6 +250,19 @@ class RigRuns(unittest.TestCase):
         self.assertEqual(pool.rejected, 0, pool.reasons)
         self.assertTrue(1e-6 <= pool.suggested[0] < 1.0, pool.suggested)
         self.assertEqual(rig.pool_diff, pool.suggested[0])
+
+    def test_public_pool_style_difficulty_takes_effect_without_a_new_job(self):
+        # public-pool opens at difficulty 100000, answers the suggestion with a
+        # set_difficulty but no new job, and sends jobs only once a minute.
+        pool = self.pool(diff=100000, honor_suggest=True, suggest_sends_job=False,
+                         judge_by_session=True, job_every=600)
+        with mock.patch.object(miner.Rig, "suggestion", return_value=0.0002):
+            rig = self.start(pool.address)
+            self.assertTrue(self.wait(lambda: pool.accepted >= 3, 30), self.out.getvalue())
+        log = self.finish()
+        self.assertEqual(pool.rejected, 0, pool.reasons)
+        self.assertEqual(rig.pool_diff, 0.0002)
+        self.assertIn("accepted #1", log)
 
     def test_a_dead_pool_is_skipped_for_the_backup(self):
         dead, pool = closed_port(), self.pool()
